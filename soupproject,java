@@ -60,7 +60,7 @@ public class ReviewScraper {
                     if (comment.isEmpty()) comment = "Not Provided";
 
                     // Retrieve the star rating
-                    String rating = reviewCard.select(".review-rating").text().replace("\"", "\"\"");
+                    String rating = reviewCard.select(".review_stars").text().replace("\"", "\"\"");
                     if (rating.isEmpty()) rating = "No Rating";
 
                     // Retrieve the review date
