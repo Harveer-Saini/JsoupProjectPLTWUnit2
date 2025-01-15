@@ -1,0 +1,137 @@
+import org.jsoup.Jsoup;
+import org.jsoup.Connection;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ReviewScraper {
+    public static void main(String[] args) {
+        String baseUrl = "https://www.sitejabber.com/reviews/roku.com?page=";
+        int maxPages = 50; // Total number of pages to process
+        String csvFile = "roku_reviews.csv";
+        List<Review> reviews = new ArrayList<>();
+
+        try (FileWriter fileWriter = new FileWriter(csvFile)) {
+            // Write header row to the CSV file
+            fileWriter.write("\"Name\",\"Comment\",\"Rating\",\"Date\"\n");
+            int totalReviews = 0;
+
+            for (int pageNum = 1; pageNum <= maxPages; pageNum++) {
+                String currentPageUrl = baseUrl + pageNum;
+
+                Connection webConnection = Jsoup.connect(currentPageUrl)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                   "Chrome/115.0.0.0 Safari/537.36")
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
+                        .header("Accept-Language", "en-US,en;q=0.9")
+                        .header("Accept-Encoding", "gzip, deflate, br")
+                        .header("Referer", "https://www.sitejabber.com/")
+                        .timeout(10000)
+                        .followRedirects(true);
+
+                // Pause briefly to simulate a human user
+                try {
+                    Thread.sleep((int) (2000 + Math.random() * 3000));
+                } catch (InterruptedException ex) {
+                    System.err.println("Thread sleep interrupted: " + ex.getMessage());
+                }
+
+                Document pageDoc = webConnection.get();
+                System.out.println("Scraping data from Page " + pageNum + "...");
+
+                // Locate review elements on the page
+                Elements reviewCards = pageDoc.select("div.review"); // Adjusted to fit the webpage structure
+                if (reviewCards.isEmpty()) {
+                    System.out.println("No reviews found on page " + pageNum + ". Stopping further scraping.");
+                    break;
+                }
+
+                for (Element reviewCard : reviewCards) {
+                    // Retrieve the reviewer's name
+                    String name = reviewCard.select(".review-user-name").text().replace("\"", "\"\"");
+                    if (name.isEmpty()) name = "Not Available";
+
+                    // Retrieve the review text
+                    String comment = reviewCard.select(".review-text").text().replace("\"", "\"\"");
+                    if (comment.isEmpty()) comment = "Not Provided";
+
+                    // Retrieve the star rating
+                    String rating = reviewCard.select(".review-rating").text().replace("\"", "\"\"");
+                    if (rating.isEmpty()) rating = "No Rating";
+
+                    // Retrieve the review date
+                    String reviewDate = reviewCard.select(".review-date").text().replace("\"", "\"\"");
+                    if (reviewDate.isEmpty()) reviewDate = "Unknown Date";
+
+                    // Create Review object and add to list
+                    reviews.add(new Review(name, comment, rating, reviewDate));
+
+                    // Write the extracted data into the CSV file
+                    fileWriter.write("\"" + name + "\",\"" + comment + "\",\"" + rating + "\",\"" + reviewDate + "\"\n");
+                    totalReviews++;
+                }
+            }
+
+            System.out.println("Scraping process completed. Total reviews collected: " + totalReviews);
+            System.out.println("Output file saved to: " + csvFile);
+
+            // Display the reviews in table format
+            System.out.println("Displaying reviews in table format:");
+            displayReviewsTable(reviews);
+
+            // Print targeted advertisements
+            System.out.println("\nTargeted Advertisements for Apple TV:");
+            for (Review review : reviews) {
+                if (isPositiveReview(review.comment)) {
+                    System.out.println("\nUser: " + review.name);
+                    System.out.println("Comment: " + review.comment);
+                    System.out.println("Advertisement: " + review.name + ", based on your review of Roku, we recommend upgrading to Apple TV for the best streaming experience!");
+                }
+            }
+
+        } catch (IOException ioEx) {
+            System.err.println("An error occurred during file or network operations: " + ioEx.getMessage());
+        }
+    }
+
+    // Helper method to display reviews in a table format
+    private static void displayReviewsTable(List<Review> reviews) {
+        System.out.println(String.format("%-30s %-100s %-10s %-20s", "Name", "Comment", "Rating", "Date"));
+        System.out.println("------------------------------------------------------------------------------------");
+        for (Review review : reviews) {
+            System.out.println(String.format("%-30s %-100s %-10s %-20s", review.name, review.comment, review.rating, review.reviewDate));
+        }
+    }
+
+    // Helper method to determine if a review is positive (contains certain keywords)
+    private static boolean isPositiveReview(String comment) {
+        // Keywords that indicate a positive review
+        String[] positiveKeywords = {"great", "amazing", "good", "easy", "fast", "love", "excellent", "perfect"};
+
+        for (String keyword : positiveKeywords) {
+            if (comment.toLowerCase().contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Review class to hold individual review data
+    static class Review {
+        String name;
+        String comment;
+        String rating;
+        String reviewDate;
+
+        public Review(String name, String comment, String rating, String reviewDate) {
+            this.name = name;
+            this.comment = comment;
+            this.rating = rating;
+            this.reviewDate = reviewDate;
+        }
+    }
+}
